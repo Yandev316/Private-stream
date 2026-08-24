@@ -34,6 +34,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     let pcMap = new Map(); // transmitter -> viewer pc map
     let viewerPc = null; // viewer pc when receiving
+    let viewerIceQueue = [];
+    const transmitterIceQueues = new Map();
     let localStream = null;
     let me = { id: null, name: '', isHost: false };
     let room = { code: null, users: [], transmitting:false, transmitter:null };
@@ -284,20 +286,80 @@ document.addEventListener('DOMContentLoaded', ()=>{
       }
 
       socket.on('offer', async ({ from, sdp })=>{
-        // viewer receives offer
         try{
+          if (viewerPc) { try{ viewerPc.close(); }catch(e){} }
           viewerPc = new RTCPeerConnection(getIceConfig());
-          viewerPc.ontrack = (e)=>{ remoteVideo.srcObject = e.streams[0]; try{ remoteVideo.play(); }catch(e){} remoteVideo.style.opacity='1'; };
-          viewerPc.onicecandidate = (e)=>{ if (e.candidate) socket.emit('ice-candidate', { target: from, candidate: e.candidate }); };
+          viewerIceQueue = [];
+
+          viewerPc.ontrack = (e)=>{
+            const stream = e.streams && e.streams[0];
+            if (stream) {
+              remoteVideo.srcObject = stream;
+              remoteVideo.style.opacity = '1';
+              remoteVideo.play().catch(()=>{
+                remoteVideo.muted = true;
+                remoteVideo.play().catch(()=>{});
+              });
+            }
+          };
+
+          viewerPc.onconnectionstatechange = ()=>{
+            console.debug('viewer WebRTC state:', viewerPc.connectionState);
+            if (viewerPc.connectionState === 'failed')
+              console.warn('WebRTC failed: TURN may be required on this network.');
+          };
+
+          viewerPc.onicecandidate = (e)=>{
+            if (e.candidate) socket.emit('ice-candidate', { target: from, candidate: e.candidate });
+          };
+
           await viewerPc.setRemoteDescription(new RTCSessionDescription(sdp));
-          const answer = await viewerPc.createAnswer(); await viewerPc.setLocalDescription(answer);
-          socket.emit('answer', { target: from, sdp: answer });
+
+          for (const candidate of viewerIceQueue.splice(0)) {
+            try{ await viewerPc.addIceCandidate(candidate); }catch(err){ console.warn('queued ICE:', err); }
+          }
+
+          const answer = await viewerPc.createAnswer();
+          await viewerPc.setLocalDescription(answer);
+          socket.emit('answer', { target: from, sdp: viewerPc.localDescription });
         }catch(e){ console.error('handle offer error', e); }
       });
 
-      socket.on('answer', async ({ from, sdp })=>{ const pc = pcMap.get(from); if (!pc) return; try{ await pc.setRemoteDescription(new RTCSessionDescription(sdp)); }catch(e){ console.error('setRemoteDescription error', e); } });
+      socket.on('answer', async ({ from, sdp })=>{
+        const pc = pcMap.get(from);
+        if (!pc) return;
+        try{
+          await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+          const queue = transmitterIceQueues.get(from) || [];
+          for (const candidate of queue.splice(0)) {
+            try{ await pc.addIceCandidate(candidate); }catch(err){ console.warn('queued ICE:', err); }
+          }
+        }catch(e){ console.error('setRemoteDescription error', e); }
+      });
 
-      socket.on('ice-candidate', async ({ from, candidate })=>{ let pc = pcMap.get(from) || viewerPc; if (!pc) return; try{ await pc.addIceCandidate(candidate); }catch(e){ console.error('addIceCandidate error', e); } });
+      socket.on('ice-candidate', async ({ from, candidate })=>{
+        if (!candidate) return;
+
+        const transmitterPc = pcMap.get(from);
+        if (transmitterPc) {
+          if (transmitterPc.remoteDescription) {
+            try{ await transmitterPc.addIceCandidate(candidate); }catch(e){ console.warn('ICE transmitter:', e); }
+          } else {
+            const q = transmitterIceQueues.get(from) || [];
+            q.push(candidate);
+            transmitterIceQueues.set(from, q);
+          }
+          return;
+        }
+
+        if (viewerPc) {
+          if (viewerPc.remoteDescription) {
+            try{ await viewerPc.addIceCandidate(candidate); }catch(e){ console.warn('ICE viewer:', e); }
+          } else {
+            viewerIceQueue.push(candidate);
+          }
+        }
+      });
 
       socket.on('removed', ({ reason })=>{ alert(reason); cleanupAndReturn(); });
       socket.on('disconnect', ()=>{ alert('Conexão perdida'); cleanupAndReturn(); });
@@ -316,7 +378,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
 
     // ICE config helper
-    function getIceConfig(){ const cfg = { iceServers:[ { urls:'stun:stun.l.google.com:19302' } ] }; try{ if (window && window.RTC_CONFIG && Array.isArray(window.RTC_CONFIG.iceServers)) return window.RTC_CONFIG; }catch(e){} return cfg; }
+    function getIceConfig(){
+      const fallback = {
+        iceServers: [
+          { urls:'stun:stun.l.google.com:19302' },
+          { urls:'stun:stun.cloudflare.com:3478' }
+        ],
+        iceCandidatePoolSize: 8
+      };
+      try{
+        if (window.RTC_CONFIG && Array.isArray(window.RTC_CONFIG.iceServers))
+          return { ...fallback, ...window.RTC_CONFIG, iceServers: window.RTC_CONFIG.iceServers };
+      }catch(e){}
+      return fallback;
+    }
 
   } catch (err) {
     console.error('room.js unexpected error', err);
