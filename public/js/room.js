@@ -115,6 +115,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
       for (const pc of pcMap.values()) try{ pc.close(); }catch(e){}
       pcMap.clear();
       if (viewerPc) try{ viewerPc.close(); }catch(e){} viewerPc=null;
+      // ensure start button is enabled when stream stops
+      if (startBtn) startBtn.disabled = false;
       updateUI(false);
     }
 
@@ -134,8 +136,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if (liveBadge) liveBadge.classList.remove('hidden');
         if (streamerNameEl) streamerNameEl.textContent = name ? `${name} está transmitindo` : '';
         if (statusDiv) statusDiv.textContent='Transmissão ativa';
+        // disable start while transmitting
+        if (startBtn) startBtn.disabled = true;
       } else {
         if (startBtn) startBtn.classList.remove('hidden');
+        if (startBtn) startBtn.disabled = false;
         if (stopBtn) stopBtn.classList.add('hidden');
         if (liveBadge) liveBadge.classList.add('hidden');
         if (streamerNameEl) streamerNameEl.textContent='';
