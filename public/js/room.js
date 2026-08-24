@@ -91,14 +91,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         localStream = await navigator.mediaDevices.getDisplayMedia({ video: videoConstraints, audio: wantAudio });
         // show local preview
         try{ if (localPreview) { localPreview.srcObject = localStream; localPreview.classList.remove('hidden'); try{ localPreview.play(); }catch(e){} } }catch(e){}
-        // if connected to LiveKit, publish tracks
-        try{
-          if (lkRoom && lkRoom.localParticipant) {
-            for (const t of localStream.getTracks()) {
-              try{ await lkRoom.localParticipant.publishTrack(t); }catch(e){ console.warn('publishTrack failed', e); }
-            }
-          }
-        }catch(e){ console.warn('publish to LiveKit error', e); }
+        // publish will be done via direct RTCPeerConnections to viewers (server will ask to create peers)
         // update quality label for transmitter
         if (qualityLabel) {
           let txt = 'Qualidade: ' + (q === 'auto' ? 'Automática' : (q === 'high' ? 'Alta (1080p)' : (q === 'medium' ? 'Média (720p)' : 'Baixa (480p)')));
@@ -117,13 +110,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     function stopLocalStream(){
       if (localStream) { localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
-      // unpublish from LiveKit if present
-      try{
-        if (lkRoom && lkRoom.localParticipant) {
-          const pubs = Array.from(lkRoom.localParticipant.getPublishedTracks());
-          pubs.forEach(p=>{ try{ lkRoom.localParticipant.unpublishTrack(p.track); }catch(e){} });
-        }
-      }catch(e){ console.warn('error unpublishing on stopLocalStream', e); }
+      // nothing to unpublish here (we close local tracks and RTCPeerConnections)
       try{ if (localPreview) { localPreview.pause(); localPreview.srcObject = null; localPreview.classList.add('hidden'); } }catch(e){}
       for (const pc of pcMap.values()) try{ pc.close(); }catch(e){}
       pcMap.clear();
@@ -156,45 +143,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
       }
     }
 
-    // join and signaling + LiveKit integration
-    let lkRoom = null;
-    let livekitModule = null;
-    async function connectToLiveKit(identity, roomName){
-      try{
-        livekitModule = await import('https://unpkg.com/@livekit/client@2.28.0/dist/esm/index.js');
-        const { connect } = livekitModule;
-        const res = await fetch('/livekit/token', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ identity, room: roomName }) });
-        if (!res.ok) throw new Error('token request failed');
-        const data = await res.json();
-        if (!data || !data.token || !data.url) throw new Error('invalid token response');
-        const url = data.url;
-        const token = data.token;
-        lkRoom = await connect(url, token, { autoSubscribe: true });
-
-        // subscribe to remote tracks
-        lkRoom.on('trackSubscribed', (track, publication, participant) => {
-          if (track.kind === 'video') {
-            try{
-              remoteVideo.srcObject = track.mediaStreamTrack ? new MediaStream([track.mediaStreamTrack]) : publication.track;
-              remoteVideo.style.opacity='1';
-              remoteVideo.play && remoteVideo.play().catch(()=>{});
-            }catch(e){console.warn('attach remote track error', e)}
-          }
-        });
-
-        // handle participant published events (subscribe automatically)
-        lkRoom.on('participantConnected', (p) => {
-          // no-op: autoSubscribe will fire trackSubscribed
-        });
-
-        // cleanup on disconnect
-        lkRoom.on('disconnected', ()=>{ lkRoom = null; });
-        return lkRoom;
-      }catch(e){ console.error('connectToLiveKit error', e); return null; }
-    }
-
+    // join and signaling
     if (socket) {
-      socket.emit('join-room', { code: roomCode, name: myName }, async (resp)=>{ if (resp && resp.error){ alert(resp.error); location.href='/'; } else { try{ await connectToLiveKit(myName, roomCode); }catch(e){console.warn('LiveKit connect failed', e);} } });
+      socket.emit('join-room', { code: roomCode, name: myName }, (resp)=>{ if (resp && resp.error){ alert(resp.error); location.href='/'; } });
 
       socket.on('connect', ()=>{ me.id = socket.id; console.debug('socket connected', socket.id); });
 
@@ -209,19 +160,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
       socket.on('stream-started', ({ transmitter, name })=>{
         room.transmitting=true; room.transmitter=transmitter; updateUI(true, transmitter, name || '');
-        // LiveKit handles media; viewers already connected and will receive published tracks
+        // If I'm viewer, I'll wait for offers; if I'm transmitter server will emit 'new-viewer' events
       });
 
       socket.on('stream-stopped', ({ by, prevTransmitter })=>{
         room.transmitting=false; room.transmitter=null;
-        // If local participant published, unpublish/stop
-        try{
-          if (lkRoom && lkRoom.localParticipant) {
-            // unpublish all local tracks
-            const pubs = Array.from(lkRoom.localParticipant.getPublishedTracks());
-            pubs.forEach(p=>{ try{ lkRoom.localParticipant.unpublishTrack(p.track); }catch(e){} });
-          }
-        }catch(e){console.warn('error unpublishing', e)}
         // stop local stream resources
         stopLocalStream();
         updateUI(false);
@@ -239,7 +182,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
         updateUI(false);
       });
 
-      // no-op for new-viewer: LiveKit handles peers
+      socket.on('new-viewer', async ({ viewerId })=>{
+        // transmitter: create pc for this viewer
+        if (!localStream) return;
+        const pc = new RTCPeerConnection(getIceConfig());
+        pcMap.set(viewerId, pc);
+        pc.onicecandidate = (e)=>{ if (e.candidate) socket.emit('ice-candidate', { target: viewerId, candidate: e.candidate }); };
+        pc.onconnectionstatechange = ()=>{ if (pc.connectionState === 'failed' || pc.connectionState === 'closed') try{ pc.close(); }catch(e){} };
+        for (const t of localStream.getTracks()) pc.addTrack(t, localStream);
+        try{ const offer = await pc.createOffer(); await pc.setLocalDescription(offer); socket.emit('offer', { target: viewerId, sdp: offer }); }catch(e){ console.error('createOffer error', e); }
+      });
 
       // mute button toggles share of audio tracks
       if (muteBtn) {
