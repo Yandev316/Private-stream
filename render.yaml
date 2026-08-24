@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: private-stream
+    env: node
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "npm start"
