@@ -49,6 +49,7 @@ function createRoom(hostName, hostSocketId) {
     code,
     host: hostSocketId,
     users: new Map(), // socketId => {name, isHost}
+    messages: [], // chat history, [{from,name,text,ts}]
     transmitting: false,
     transmitter: null,
     createdAt: Date.now(),
@@ -126,6 +127,12 @@ io.on('connection', (socket) => {
     // Notify
     io.to(room.code).emit('users-updated', serializeUsers(room));
 
+    // send recent chat history to the joiner
+    try {
+      const history = (room.messages || []).slice(-200);
+      socket.emit('chat-history', { messages: history });
+    } catch (e) { console.error('error sending chat history', e); }
+
     // If someone is transmitting, notify the joiner
     if (room.transmitting && room.transmitter) {
       socket.emit('stream-started', { transmitter: room.transmitter, name: room.users.get(room.transmitter)?.name || '' });
@@ -191,6 +198,24 @@ io.on('connection', (socket) => {
     if (!room) return;
     // forward offer to target
     io.to(target).emit('offer', { from: socket.id, sdp });
+  });
+
+  // chat message handler
+  socket.on('chat-message', ({ text }, cb) => {
+    const code = socket.data.roomCode;
+    if (!code) return cb && cb({ error: 'Not in a room' });
+    const room = findRoomByCode(code);
+    if (!room) return cb && cb({ error: 'Sala não encontrada' });
+    const user = room.users.get(socket.id);
+    const sanitized = (typeof text === 'string') ? text.trim().slice(0, 1000) : '';
+    if (!sanitized) return cb && cb({ error: 'Mensagem vazia' });
+    const msg = { from: socket.id, name: (user && user.name) || 'Anon', text: sanitized, ts: Date.now() };
+    room.messages = room.messages || [];
+    room.messages.push(msg);
+    // keep history bounded
+    if (room.messages.length > 500) room.messages = room.messages.slice(-500);
+    io.to(room.code).emit('chat-message', msg);
+    cb && cb({ success: true });
   });
 
   socket.on('answer', ({ target, sdp }) => {

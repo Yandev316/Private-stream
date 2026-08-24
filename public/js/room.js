@@ -27,6 +27,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const fitModeSelect = document.getElementById('fitMode');
     const scaleDownLarge = document.getElementById('scaleDownLarge');
     const videoArea = document.getElementById('videoArea');
+    const chatList = document.getElementById('chatList');
+    const chatForm = document.getElementById('chatForm');
+    const chatInput = document.getElementById('chatInput');
+    const chatSend = document.getElementById('chatSend');
 
     let pcMap = new Map(); // transmitter -> viewer pc map
     let viewerPc = null; // viewer pc when receiving
@@ -63,6 +67,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if (fitModeSelect) applyFitModeClass(fitModeSelect.value || 'contain');
 
     console.debug('room.js init', { roomCode, myName, socketAvailable: !!socket });
+
+    function sanitizeText(s){ return String(s || '').replace(/</g,'&lt;').replace(/>/g,'&gt;').slice(0,1000); }
+
+    function appendChatMessage(msg, self){
+      if (!chatList) return;
+      const el = document.createElement('div'); el.className='chat-message';
+      const meta = document.createElement('div'); meta.className='meta';
+      const time = new Date(msg.ts || Date.now());
+      meta.textContent = `${msg.name || 'Anon'} • ${time.toLocaleTimeString()}`;
+      const text = document.createElement('div'); text.className='text'; text.innerHTML = sanitizeText(msg.text);
+      el.appendChild(meta); el.appendChild(text);
+      chatList.appendChild(el);
+      // scroll to bottom
+      try{ chatList.scrollTop = chatList.scrollHeight; }catch(e){}
+    }
 
     // copy code
     if (copyBtn) copyBtn.addEventListener('click', async ()=>{
@@ -201,6 +220,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // ensure UI reflects current transmitting state and host role
         updateUI(room.transmitting, room.transmitter, '');
       });
+
+      // chat history and live messages
+      socket.on('chat-history', ({ messages })=>{
+        try{ if (Array.isArray(messages)) { chatList.innerHTML=''; messages.forEach(m=>appendChatMessage(m)); } }catch(e){ console.error('chat-history', e); }
+      });
+
+      socket.on('chat-message', (msg)=>{
+        try{ appendChatMessage(msg, msg.from === me.id); }catch(e){ console.error('chat-message', e); }
+      });
+
+      // send chat
+      if (chatForm && chatInput) {
+        chatForm.addEventListener('submit', (ev)=>{ ev.preventDefault(); const text = chatInput.value; if(!text || !socket) return; chatSend.disabled=true; socket.emit('chat-message', { text }, (resp)=>{ chatSend.disabled=false; if (resp && resp.error){ alert(resp.error); } else { chatInput.value=''; } }); });
+        chatInput.addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); chatForm.dispatchEvent(new Event('submit',{cancelable:true})); } });
+      }
 
       socket.on('stream-started', ({ transmitter, name })=>{
         room.transmitting=true; room.transmitter=transmitter; updateUI(true, transmitter, name || '');

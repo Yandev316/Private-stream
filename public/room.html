@@ -89,11 +89,20 @@
       </section>
 
       <aside class="sidebar">
-        <div class="sidebar-header">
-          <h3>Usuários online</h3>
-          <div id="userCount" class="count-bubble">0</div>
-        </div>
-        <ul id="usersList" class="users"></ul>
+          <div class="sidebar-header">
+            <h3>Usuários online</h3>
+            <div id="userCount" class="count-bubble">0</div>
+          </div>
+          <ul id="usersList" class="users"></ul>
+
+          <div class="chat-panel">
+            <div class="chat-header">Chat ao vivo</div>
+            <div id="chatList" class="chat-list" aria-live="polite"></div>
+            <form id="chatForm" class="chat-form">
+              <input id="chatInput" class="chat-input" placeholder="Escreva uma mensagem..." autocomplete="off" />
+              <button id="chatSend" class="btn primary">Enviar</button>
+            </form>
+          </div>
       </aside>
     </main>
 
