@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const { customAlphabet } = require('nanoid');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,7 +18,17 @@ const rooms = new Map();
 
 // Generate 6-char codes, avoid confusing chars
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const nano = customAlphabet(alphabet, 6);
+
+function generateCode(len = 6) {
+  const chars = alphabet;
+  const bytes = crypto.randomBytes(len);
+  let res = '';
+  for (let i = 0; i < len; i++) {
+    // map byte to range
+    res += chars[bytes[i] % chars.length];
+  }
+  return res;
+}
 
 function sanitizeName(name) {
   if (!name || typeof name !== 'string') return null;
@@ -31,7 +41,7 @@ function sanitizeName(name) {
 function createRoom(hostName, hostSocketId) {
   let code;
   do {
-    code = nano();
+    code = generateCode(6);
   } while (Array.from(rooms.values()).some(r => r.code === code && r.active));
 
   const room = {
