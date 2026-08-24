@@ -52,7 +52,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if (leaveBtn) leaveBtn.addEventListener('click', ()=>{ if (socket) socket.emit('leave-room', ()=>{}); cleanupAndReturn(); });
 
     if (startBtn) startBtn.addEventListener('click', startTransmit);
-    if (stopBtn) stopBtn.addEventListener('click', ()=>{ if (socket) socket.emit('stop-transmit', ()=>{}); stopLocalStream(); });
+    if (stopBtn) stopBtn.addEventListener('click', ()=>{
+      if (!socket) return;
+      stopBtn.disabled = true;
+      socket.emit('stop-transmit', (resp)=>{
+        if (resp && resp.error) {
+          alert(resp.error);
+          stopBtn.disabled = false;
+        }
+        // wait for server 'stream-stopped' to actually stop local streams and update UI
+      });
+    });
 
     if (fullscreenBtn) fullscreenBtn.addEventListener('click', ()=>{ const el = remoteVideo || document.getElementById('videoArea'); if (el && el.requestFullscreen) el.requestFullscreen(); });
 
@@ -80,7 +90,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     function cleanupAndReturn(){ stopLocalStream(); try{ if (socket) socket.disconnect(); }catch(e){} location.href='/'; }
 
-    function updateUI(isTransmitting, name){ if (isTransmitting){ if (startBtn) startBtn.classList.add('hidden'); if (stopBtn) stopBtn.classList.remove('hidden'); if (liveBadge) liveBadge.classList.remove('hidden'); if (streamerNameEl) streamerNameEl.textContent = name ? `${name} está transmitindo` : ''; if (statusDiv) statusDiv.textContent='Transmissão ativa'; } else { if (startBtn) startBtn.classList.remove('hidden'); if (stopBtn) stopBtn.classList.add('hidden'); if (liveBadge) liveBadge.classList.add('hidden'); if (streamerNameEl) streamerNameEl.textContent=''; if (statusDiv) statusDiv.textContent='Nenhuma transmissão ativa'; } }
+    function updateUI(isTransmitting, transmitterId, name){
+      if (isTransmitting){
+        if (startBtn) startBtn.classList.add('hidden');
+        if (stopBtn) {
+          // only show stop to transmitter or host
+          if (me.id && transmitterId && (me.id === transmitterId || me.isHost)) {
+            stopBtn.classList.remove('hidden'); stopBtn.disabled = false;
+          } else {
+            stopBtn.classList.add('hidden');
+          }
+        }
+        if (liveBadge) liveBadge.classList.remove('hidden');
+        if (streamerNameEl) streamerNameEl.textContent = name ? `${name} está transmitindo` : '';
+        if (statusDiv) statusDiv.textContent='Transmissão ativa';
+      } else {
+        if (startBtn) startBtn.classList.remove('hidden');
+        if (stopBtn) stopBtn.classList.add('hidden');
+        if (liveBadge) liveBadge.classList.add('hidden');
+        if (streamerNameEl) streamerNameEl.textContent='';
+        if (statusDiv) statusDiv.textContent='Nenhuma transmissão ativa';
+      }
+    }
 
     // join and signaling
     if (socket) {
@@ -90,9 +121,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
       socket.on('users-updated', (data)=>{ room = data; renderUsers(data.users); const meEntry = data.users.find(u=>u.id===me.id); if (meEntry) me.isHost = meEntry.isHost; });
 
-      socket.on('stream-started', ({ transmitter, name })=>{ room.transmitting=true; room.transmitter=transmitter; updateUI(true, name || ''); if (room.transmitter !== me.id){ /* viewer side will wait for offer */ } });
+      socket.on('stream-started', ({ transmitter, name })=>{
+        room.transmitting=true; room.transmitter=transmitter; updateUI(true, transmitter, name || '');
+        // if I'm viewer, wait for 'offer' events; if I'm transmitter, server will send 'new-viewer' events
+      });
 
-      socket.on('stream-stopped', ()=>{ room.transmitting=false; room.transmitter=null; stopLocalStream(); });
+      socket.on('stream-stopped', ({ by, prevTransmitter })=>{
+        room.transmitting=false; room.transmitter=null;
+        // stop local receiving streams for viewers
+        if (viewerPc) { try{ viewerPc.getSenders && viewerPc.getSenders().forEach(s=>{}); viewerPc.close(); }catch(e){} viewerPc = null; }
+        stopLocalStream();
+        updateUI(false);
+      });
+
+      socket.on('transmitter-stopped', ({ prevTransmitter })=>{
+        // cleanup any state related to prevTransmitter (for transmitters/viewers)
+        if (pcMap && typeof pcMap === 'object') {
+          for (const [k, pc] of pcMap.entries()) {
+            try{ pc.close(); }catch(e){}
+          }
+          pcMap.clear();
+        }
+        if (viewerPc) { try{ viewerPc.close(); }catch(e){} viewerPc=null }
+        updateUI(false);
+      });
 
       socket.on('new-viewer', async ({ viewerId })=>{
         // transmitter: create pc for this viewer

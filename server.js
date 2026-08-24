@@ -138,6 +138,17 @@ io.on('connection', (socket) => {
     room.transmitter = socket.id;
     io.to(room.code).emit('stream-started', { transmitter: socket.id, name: user.name });
 
+    // Notify the new transmitter about existing viewers so it can create peers for them
+    try {
+      for (const [sid] of room.users.entries()) {
+        if (sid === socket.id) continue;
+        // inform transmitter to create a peer for this existing viewer
+        io.to(socket.id).emit('new-viewer', { viewerId: sid });
+      }
+    } catch (e) {
+      console.error('error notifying transmitter of existing viewers', e);
+    }
+
     cb && cb({ success: true });
   });
 
@@ -151,7 +162,16 @@ io.on('connection', (socket) => {
     room.transmitting = false;
     const prev = room.transmitter;
     room.transmitter = null;
+    // notify all clients that stream stopped
     io.to(room.code).emit('stream-stopped', { by: socket.id, prevTransmitter: prev });
+
+    // ask all clients to cleanup any transmitter-side peer state referencing prev
+    try {
+      for (const [sid] of room.users.entries()) {
+        io.to(sid).emit('transmitter-stopped', { prevTransmitter: prev });
+      }
+    } catch (e) { console.error('error notifying clients about transmitter stopped', e); }
+
     cb && cb({ success: true });
   });
 
