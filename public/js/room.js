@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
       if (isTransmitting){
         if (startBtn) startBtn.classList.add('hidden');
         if (stopBtn) {
-          // only show stop to transmitter or host
+          // show stop to the actual transmitter or the host
           if (me.id && transmitterId && (me.id === transmitterId || me.isHost)) {
             stopBtn.classList.remove('hidden'); stopBtn.disabled = false;
           } else {
@@ -119,7 +119,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
       socket.on('connect', ()=>{ me.id = socket.id; console.debug('socket connected', socket.id); });
 
-      socket.on('users-updated', (data)=>{ room = data; renderUsers(data.users); const meEntry = data.users.find(u=>u.id===me.id); if (meEntry) me.isHost = meEntry.isHost; });
+      socket.on('users-updated', (data)=>{
+        room = data;
+        renderUsers(data.users);
+        const meEntry = data.users.find(u=>u.id===me.id);
+        if (meEntry) me.isHost = meEntry.isHost;
+        // ensure UI reflects current transmitting state and host role
+        updateUI(room.transmitting, room.transmitter, '');
+      });
 
       socket.on('stream-started', ({ transmitter, name })=>{
         room.transmitting=true; room.transmitter=transmitter; updateUI(true, transmitter, name || '');
@@ -197,4 +204,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
     alert('Erro interno no cliente. Veja o console para detalhes.');
   }
 });
+
+// hide page loader when window fully loads
+function hidePageLoader(){
+  try{
+    const ld = document.getElementById('pageLoader');
+    if (!ld) return;
+    ld.classList.add('hidden');
+    setTimeout(()=>{ try{ ld.remove(); }catch(e){} }, 400);
+  }catch(e){console.error('hidePageLoader', e)}
+}
+window.addEventListener('load', hidePageLoader);
 

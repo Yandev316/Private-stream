@@ -49,3 +49,11 @@ input{display:block;width:100%;padding:12px;border-radius:10px;border:1px solid 
 .message{min-height:22px;color:#ffb3b3;margin-top:6px}
 
 @media(max-width:900px){.hero{flex-direction:column;padding:28px}.hero-left{max-width:100%;text-align:center}.auth-card{width:100%}}
+
+/* Page loader styles (shared) */
+#pageLoader{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(5,5,10,0.96),rgba(5,5,10,0.95));z-index:9999;transition:opacity .35s ease}
+.page-loader.hidden{opacity:0;pointer-events:none}
+.page-loader .loader-inner{display:flex;flex-direction:column;align-items:center;gap:12px;color:#cfe0ff}
+.page-loader .spinner{width:48px;height:48px;border-radius:50%;border:6px solid rgba(255,255,255,0.06);border-top-color:#8b5cff;animation:spin 1s linear infinite}
+.page-loader .loader-text{font-size:14px;color:#9fb0d9}
+@keyframes spin{to{transform:rotate(360deg)}}

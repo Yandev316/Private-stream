@@ -84,3 +84,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
     console.error('index.js init error', err);
   }
 });
+
+// hide page loader when fully loaded
+function hidePageLoaderIndex(){
+  try{
+    const ld = document.getElementById('pageLoader');
+    if (!ld) return;
+    ld.classList.add('hidden');
+    setTimeout(()=>{ try{ ld.remove() }catch(e){} }, 400);
+  }catch(e){console.error('hidePageLoaderIndex', e)}
+}
+window.addEventListener('load', hidePageLoaderIndex);
