@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Private Stream</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="hero">
+    <div class="hero-left">
+      <div class="badge">Dev Yan.G</div>
+      <h1 class="hero-title">Private Stream</h1>
+      <p class="hero-desc">Crie uma sala privada e compartilhe sua tela em tempo real.</p>
+    </div>
+
+    <div class="auth-card">
+      <form id="lobbyForm" onsubmit="return false;">
+        <h2 class="card-title">Entrar</h2>
+        <label for="name">Seu nome</label>
+        <input id="name" placeholder="Seu nome" maxlength="30" aria-label="Seu nome" />
+
+        <div class="actions">
+          <button id="createBtn" class="btn primary">CRIAR SALA</button>
+          <button id="enterToggle" class="btn ghost">ENTRAR EM SALA</button>
+        </div>
+
+        <div id="enterSection" class="enter-section hidden">
+          <label for="roomCode">Código da sala</label>
+          <input id="roomCode" placeholder="Código da sala" maxlength="6" aria-label="Código da sala" />
+          <button id="enterBtn" class="btn primary">ENTRAR</button>
+        </div>
+
+        <div id="message" class="message" role="status" aria-live="polite"></div>
+      </form>
+    </div>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/index.js"></script>
+</body>
+</html>

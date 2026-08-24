@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Private Stream - Sala</title>
+  <link rel="stylesheet" href="css/room.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Private Stream</div>
+    <div class="room-info">
+      <span class="room-label-inline">Sala: <strong id="roomCode">XXXXXX</strong></span>
+      <button id="copyBtn" class="btn small icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 1H4C2.9 1 2 1.9 2 3V15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 23H20C21.1 23 22 22.1 22 21V9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="8" y="1" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/></svg>
+        <span>Copiar código</span>
+      </button>
+      <span id="copyConfirm" class="copy-confirm" aria-hidden="true"></span>
+    </div>
+    <div class="actions"><button id="leaveBtn" class="btn danger">Sair da sala</button></div>
+  </header>
+
+  <!-- Confirm modal for leaving -->
+  <div id="confirmModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <h4>Tem certeza que deseja sair?</h4>
+      <p>Ao sair, você será desconectado da sala. Você pode voltar entrando novamente com o código.</p>
+      <div class="modal-actions">
+        <button id="cancelLeave" class="btn">Cancelar</button>
+        <button id="confirmLeave" class="btn danger">Sair da sala</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="room-container">
+    <section class="stage">
+      <div class="stage-header">
+        <div class="status-group">
+          <div id="status" class="status">Nenhuma transmissão ativa</div>
+          <div class="room-label">Sala: <strong class="room-code-inline">XXXXXX</strong></div>
+        </div>
+        <div class="stage-actions">
+          <button id="fullscreenBtn" class="btn icon">Tela cheia</button>
+        </div>
+      </div>
+
+      <div id="videoCard" class="video-card glass">
+        <div class="video-topbar"><span id="liveBadge" class="live hidden">● AO VIVO</span><span id="streamerName" class="streamer-name"></span></div>
+        <div id="videoArea" class="video-area">
+          <div id="placeholder" class="placeholder">Nenhuma transmissão ativa</div>
+          <video id="remoteVideo" autoplay playsinline></video>
+          <div class="video-overlay"></div>
+        </div>
+        <div class="controls">
+          <button id="startBtn" class="btn primary">Transmitir tela</button>
+          <button id="stopBtn" class="btn danger hidden">Parar transmissão</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h3>Usuários online</h3>
+        <div id="userCount" class="count-bubble">0</div>
+      </div>
+      <ul id="usersList" class="users"></ul>
+    </aside>
+  </main>
+
+  <template id="userTpl">
+    <li class="user-item">
+      <div class="avatar"></div>
+      <div class="user-info">
+        <div class="name"></div>
+        <div class="meta"></div>
+      </div>
+      <div class="user-actions"></div>
+    </li>
+  </template>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/room.js"></script>
+</body>
+</html>
