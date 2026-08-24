@@ -1,25 +1,4 @@
-const socket = (typeof io === 'function') ? io() : null;
 
-// utils
-function $q(s){return document.querySelector(s)}
-function parseQuery(){return Object.fromEntries(new URLSearchParams(location.search))}
-
-const tpl = document.getElementById('userTpl');
-const usersList = document.getElementById('usersList');
-const roomCodeSpan = document.getElementById('roomCode');
-const copyBtn = document.getElementById('copyBtn');
-const copyConfirm = document.getElementById('copyConfirm');
-const leaveBtn = document.getElementById('leaveBtn');
-const startBtn = document.getElementById('startBtn');
-const stopBtn = document.getElementById('stopBtn');
-const fullscreenBtn = document.getElementById('fullscreenBtn');
-const statusDiv = document.getElementById('status');
-const liveBadge = document.getElementById('liveBadge');
-const streamerNameEl = document.getElementById('streamerName');
-const remoteVideo = document.getElementById('remoteVideo');
-const placeholder = document.getElementById('placeholder');
-
-let pcMap = new Map(); // peer connections keyed by peerId (for transmitter side)
 // Clean, self-contained room client
 const socket = (typeof io === 'function') ? io() : null;
 
