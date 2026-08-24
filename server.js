@@ -13,6 +13,28 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
+// LiveKit token endpoint (mint access tokens for clients)
+// Expects JSON: { identity, room }
+app.post('/livekit/token', (req, res) => {
+  const { identity, room } = req.body || {};
+  const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
+  const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
+  const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://your-livekit-server:7880';
+  if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) return res.status(500).json({ error: 'LiveKit API key/secret not configured on server (env LIVEKIT_API_KEY/LIVEKIT_API_SECRET).' });
+  if (!identity || !room) return res.status(400).json({ error: 'Missing identity or room in request.' });
+  try {
+    const { AccessToken, VideoGrant } = require('livekit-server-sdk');
+    const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity });
+    const grant = new VideoGrant({ room });
+    at.addGrant(grant);
+    const token = at.toJwt();
+    return res.json({ token, url: LIVEKIT_URL });
+  } catch (e) {
+    console.error('livekit token error', e);
+    return res.status(500).json({ error: 'Failed to create LiveKit token' });
+  }
+});
+
 // Simple in-memory rooms store
 const rooms = new Map();
 
