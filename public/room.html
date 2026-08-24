@@ -59,10 +59,28 @@
               </select>
             </div>
             <div class="control-group">
+              <label for="fitMode" class="quality-label">Ajuste</label>
+              <select id="fitMode" class="quality-select" aria-label="Modo de ajuste">
+                <option value="contain">Adaptar (sem cortar)</option>
+                <option value="cover">Preencher (pode cortar)</option>
+                <option value="stretch">Esticar (preencher distorcendo)</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <label class="checkbox"><input type="checkbox" id="scaleDownLarge" checked /> Reduzir telas grandes (safe 4K)</label>
+            </div>
+            <div class="control-group">
               <label class="checkbox"><input type="checkbox" id="shareAudio" checked /> Compartilhar áudio</label>
             </div>
             <div class="control-group">
               <button id="muteBtn" class="btn icon">Desativar áudio</button>
+            </div>
+            <div class="control-group small">
+              <div class="preset-row">
+                <button class="btn preset" data-q="high">1080p</button>
+                <button class="btn preset" data-q="medium">720p</button>
+                <button class="btn preset" data-q="low">480p</button>
+              </div>
             </div>
             <button id="startBtn" class="btn primary">Transmitir tela</button>
             <button id="stopBtn" class="btn danger hidden">Parar transmissão</button>

@@ -13,10 +13,16 @@ html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial
 .live{color:#ff6b6b;font-weight:800;padding:6px 10px;border-radius:999px;background:rgba(255,80,80,0.06)}
 .streamer-name{color:#cfe0ff}
 .video-area{background:linear-gradient(180deg, rgba(0,0,0,0.65), rgba(0,0,0,0.55));border-radius:10px;height:420px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
-.video-area video{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .45s ease}
+.video-area video{width:100%;height:100%;display:block;opacity:0;transition:opacity .45s ease}
+.video-area.fit-contain video{object-fit:contain}
+.video-area.fit-cover video{object-fit:cover}
+.video-area.fit-stretch video{object-fit:fill}
 .video-area .placeholder{color:#9aa3b2;text-align:center;padding:12px}
 .preview-wrap{position:absolute;right:14px;bottom:14px;width:220px;height:140px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.04);box-shadow:0 6px 20px rgba(0,0,0,0.6);z-index:5;background:#071124}
 .local-preview{width:100%;height:100%;object-fit:cover;opacity:0.95}
+.preset-row{display:flex;gap:8px}
+.preset{padding:6px 8px;border-radius:8px;font-size:13px}
+.control-group.small{align-items:flex-end}
 .controls{margin-top:12px;display:flex;gap:12px}
 .control-group{display:flex;flex-direction:column;justify-content:center}
 .quality-label{font-size:13px;color:#9fb0d9;margin-bottom:6px}
@@ -47,6 +53,14 @@ html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial
 @media(max-width:900px){.room-container{grid-template-columns:1fr 260px}}
 @media(max-width:640px){.room-container{grid-template-columns:1fr}.sidebar{order:2;margin-top:12px;width:100%;padding:12px;border-left:0}}
 @media(max-width:480px){.video-area{height:200px}.controls .btn{padding:8px 10px}.count-bubble{min-width:26px;height:26px}}
+
+/* Responsive improvements for very wide / tall displays */
+@media (min-aspect-ratio: 16/9){
+	.video-area{height:60vh}
+}
+@media (max-aspect-ratio: 4/3){
+	.video-area{height:55vh}
+}
 
 /* Page loader */
 #pageLoader{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(5,1,10,0.96),rgba(5,1,10,0.95));z-index:9999;transition:opacity .35s ease;}

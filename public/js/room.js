@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const muteBtn = document.getElementById('muteBtn');
     const localPreview = document.getElementById('localPreview');
     const qualityLabel = document.getElementById('qualityLabel');
+    const fitModeSelect = document.getElementById('fitMode');
+    const scaleDownLarge = document.getElementById('scaleDownLarge');
+    const videoArea = document.getElementById('videoArea');
 
     let pcMap = new Map(); // transmitter -> viewer pc map
     let viewerPc = null; // viewer pc when receiving
@@ -45,6 +48,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if (!roomCode || !myName) { alert('Parâmetros inválidos'); location.href='/'; }
     if (roomCodeSpan) roomCodeSpan.textContent = roomCode;
     const inline = document.querySelector('.room-code-inline'); if (inline) inline.textContent = roomCode;
+
+    // wire preset buttons
+    const presetBtns = document.querySelectorAll('.preset');
+    if (presetBtns && presetBtns.length) {
+      presetBtns.forEach(b=>{
+        b.addEventListener('click', (e)=>{
+          const q = b.getAttribute('data-q');
+          if (qualitySelect) { qualitySelect.value = q; }
+        });
+      });
+    }
+    // set initial fit mode
+    if (fitModeSelect) applyFitModeClass(fitModeSelect.value || 'contain');
 
     console.debug('room.js init', { roomCode, myName, socketAvailable: !!socket });
 
@@ -81,12 +97,33 @@ document.addEventListener('DOMContentLoaded', ()=>{
       }
     }
 
+    function applyFitModeClass(mode){
+      if (!videoArea) return;
+      videoArea.classList.remove('fit-contain','fit-cover','fit-stretch');
+      if (mode === 'contain') videoArea.classList.add('fit-contain');
+      else if (mode === 'cover') videoArea.classList.add('fit-cover');
+      else if (mode === 'stretch') videoArea.classList.add('fit-stretch');
+    }
+
     async function startTransmit(){
       if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) { alert('Compartilhamento não suportado'); return; }
       startBtn.disabled = true;
       try{
         const q = qualitySelect ? qualitySelect.value : 'auto';
-        const videoConstraints = getConstraintsForQuality(q);
+        // respect preset for very large displays
+        const screenW = (window && window.screen && window.screen.width) ? window.screen.width : 0;
+        const screenH = (window && window.screen && window.screen.height) ? window.screen.height : 0;
+        let videoConstraints = getConstraintsForQuality(q);
+        const safeReduce = scaleDownLarge ? Boolean(scaleDownLarge.checked) : true;
+        if (safeReduce && (screenW >= 3840 || screenH >= 2160)) {
+          // avoid black/empty capture on very large monitors: request a lower ideal resolution
+          if (q === 'auto' || q === 'high') {
+            videoConstraints = getConstraintsForQuality('medium');
+          }
+        }
+        // apply fit mode to preview area
+        const fit = fitModeSelect ? fitModeSelect.value : 'contain';
+        applyFitModeClass(fit);
         const wantAudio = shareAudioCheckbox ? Boolean(shareAudioCheckbox.checked) : false;
         localStream = await navigator.mediaDevices.getDisplayMedia({ video: videoConstraints, audio: wantAudio });
         // show local preview
@@ -94,7 +131,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // publish will be done via direct RTCPeerConnections to viewers (server will ask to create peers)
         // update quality label for transmitter
         if (qualityLabel) {
+          let applied = videoConstraints === true ? q : (q === 'auto' ? 'Automática' : q);
           let txt = 'Qualidade: ' + (q === 'auto' ? 'Automática' : (q === 'high' ? 'Alta (1080p)' : (q === 'medium' ? 'Média (720p)' : 'Baixa (480p)')));
+          if (safeReduce && (screenW>=3840||screenH>=2160) && (q==='auto'||q==='high')) txt += ' (reduzido para estabilidade)';
           qualityLabel.textContent = txt;
         }
       }catch(e){ alert('Permissão negada ou falha ao capturar tela'); startBtn.disabled=false; return; }
