@@ -19,6 +19,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const liveBadge = document.getElementById('liveBadge');
     const streamerNameEl = document.getElementById('streamerName');
     const remoteVideo = document.getElementById('remoteVideo');
+    const qualitySelect = document.getElementById('qualitySelect');
+    const shareAudioCheckbox = document.getElementById('shareAudio');
+    const muteBtn = document.getElementById('muteBtn');
+    const localPreview = document.getElementById('localPreview');
+    const qualityLabel = document.getElementById('qualityLabel');
 
     let pcMap = new Map(); // transmitter -> viewer pc map
     let viewerPc = null; // viewer pc when receiving
@@ -66,22 +71,45 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     if (fullscreenBtn) fullscreenBtn.addEventListener('click', ()=>{ const el = remoteVideo || document.getElementById('videoArea'); if (el && el.requestFullscreen) el.requestFullscreen(); });
 
+    function getConstraintsForQuality(q){
+      if (!q || q === 'auto') return true;
+      switch(q){
+        case 'high': return { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } };
+        case 'medium': return { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 25 } };
+        case 'low': return { width: { ideal: 854 }, height: { ideal: 480 }, frameRate: { ideal: 15 } };
+        default: return true;
+      }
+    }
+
     async function startTransmit(){
       if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) { alert('Compartilhamento não suportado'); return; }
       startBtn.disabled = true;
       try{
-        localStream = await navigator.mediaDevices.getDisplayMedia({ video:true });
+        const q = qualitySelect ? qualitySelect.value : 'auto';
+        const videoConstraints = getConstraintsForQuality(q);
+        const wantAudio = shareAudioCheckbox ? Boolean(shareAudioCheckbox.checked) : false;
+        localStream = await navigator.mediaDevices.getDisplayMedia({ video: videoConstraints, audio: wantAudio });
+        // show local preview
+        try{ if (localPreview) { localPreview.srcObject = localStream; localPreview.classList.remove('hidden'); try{ localPreview.play(); }catch(e){} } }catch(e){}
+        // update quality label for transmitter
+        if (qualityLabel) {
+          let txt = 'Qualidade: ' + (q === 'auto' ? 'Automática' : (q === 'high' ? 'Alta (1080p)' : (q === 'medium' ? 'Média (720p)' : 'Baixa (480p)')));
+          qualityLabel.textContent = txt;
+        }
       }catch(e){ alert('Permissão negada ou falha ao capturar tela'); startBtn.disabled=false; return; }
       if (!socket) { alert('Sem conexão com sinalizador'); startBtn.disabled=false; return; }
       socket.emit('start-transmit', (resp)=>{
         if (resp && resp.error) { alert(resp.error); startBtn.disabled=false; return; }
+        // mark local room state as transmitting and set transmitter id to self
+        try{ room.transmitting = true; room.transmitter = me.id; }catch(e){}
         // we'll receive 'new-viewer' events for existing viewers
-        updateUI(true, myName);
+        updateUI(true, me.id, myName);
       });
     }
 
     function stopLocalStream(){
       if (localStream) { localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+      try{ if (localPreview) { localPreview.pause(); localPreview.srcObject = null; localPreview.classList.add('hidden'); } }catch(e){}
       for (const pc of pcMap.values()) try{ pc.close(); }catch(e){}
       pcMap.clear();
       if (viewerPc) try{ viewerPc.close(); }catch(e){} viewerPc=null;
@@ -94,8 +122,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
       if (isTransmitting){
         if (startBtn) startBtn.classList.add('hidden');
         if (stopBtn) {
-          // show stop to the actual transmitter or the host
-          if (me.id && transmitterId && (me.id === transmitterId || me.isHost)) {
+          // show stop only to the actual transmitter
+          if (me.id && transmitterId && (me.id === transmitterId)) {
             stopBtn.classList.remove('hidden'); stopBtn.disabled = false;
           } else {
             stopBtn.classList.add('hidden');
@@ -163,6 +191,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
         for (const t of localStream.getTracks()) pc.addTrack(t, localStream);
         try{ const offer = await pc.createOffer(); await pc.setLocalDescription(offer); socket.emit('offer', { target: viewerId, sdp: offer }); }catch(e){}
       });
+
+      // mute button toggles share of audio tracks
+      if (muteBtn) {
+        muteBtn.addEventListener('click', ()=>{
+          if (!localStream) return;
+          const audioTracks = localStream.getAudioTracks();
+          if (!audioTracks || audioTracks.length === 0) return;
+          const enabled = audioTracks[0].enabled;
+          audioTracks.forEach(t=>t.enabled = !enabled);
+          muteBtn.textContent = enabled ? 'Ativar áudio' : 'Desativar áudio';
+        });
+      }
 
       socket.on('offer', async ({ from, sdp })=>{
         // viewer receives offer

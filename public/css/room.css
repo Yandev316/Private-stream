@@ -15,7 +15,13 @@ html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial
 .video-area{background:linear-gradient(180deg, rgba(0,0,0,0.65), rgba(0,0,0,0.55));border-radius:10px;height:420px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
 .video-area video{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .45s ease}
 .video-area .placeholder{color:#9aa3b2;text-align:center;padding:12px}
+.preview-wrap{position:absolute;right:14px;bottom:14px;width:220px;height:140px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.04);box-shadow:0 6px 20px rgba(0,0,0,0.6);z-index:5;background:#071124}
+.local-preview{width:100%;height:100%;object-fit:cover;opacity:0.95}
 .controls{margin-top:12px;display:flex;gap:12px}
+.control-group{display:flex;flex-direction:column;justify-content:center}
+.quality-label{font-size:13px;color:#9fb0d9;margin-bottom:6px}
+.checkbox{display:flex;align-items:center;gap:8px;color:#cfe0ff}
+.quality-label-inline{font-size:13px}
 .btn{padding:10px 14px;border-radius:10px;border:0;background:transparent;color:inherit;cursor:pointer}
 .btn.primary{background:linear-gradient(90deg,#6c7bff,#8b5cff);color:#fff}
 .btn.danger{background:linear-gradient(90deg,#ff6b6b,#ff4d6d);color:#fff}

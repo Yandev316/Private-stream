@@ -39,12 +39,31 @@
           <div class="video-topbar">
             <span id="liveBadge" class="live hidden">● AO VIVO</span>
             <span id="streamerName" class="streamer-name"></span>
+            <div id="qualityLabel" class="quality-label-inline" style="margin-left:12px;color:#9fb0d9"></div>
           </div>
           <div id="videoArea" class="video-area">
             <div id="placeholder" class="placeholder">Nenhuma transmissão ativa</div>
+            <div class="preview-wrap">
+              <video id="localPreview" autoplay muted playsinline class="local-preview hidden"></video>
+            </div>
             <video id="remoteVideo" autoplay playsinline></video>
           </div>
           <div class="controls">
+            <div class="control-group">
+              <label for="qualitySelect" class="quality-label">Qualidade</label>
+              <select id="qualitySelect" class="quality-select" aria-label="Selecionar qualidade da transmissão">
+                <option value="auto">Automática</option>
+                <option value="high">Alta (1080p)</option>
+                <option value="medium">Média (720p)</option>
+                <option value="low">Baixa (480p)</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <label class="checkbox"><input type="checkbox" id="shareAudio" checked /> Compartilhar áudio</label>
+            </div>
+            <div class="control-group">
+              <button id="muteBtn" class="btn icon">Desativar áudio</button>
+            </div>
             <button id="startBtn" class="btn primary">Transmitir tela</button>
             <button id="stopBtn" class="btn danger hidden">Parar transmissão</button>
           </div>
